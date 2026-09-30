@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predicting Content Decline to Prioritize Content Review</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#555; --line:#ddd; --accent:#1f4e79; --code:#f4f4f4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141414; --fg:#e8e8e8; --muted:#a0a0a0; --line:#333; --accent:#8ab4e8; --code:#222; }
+  }
+  body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.65 Georgia, "Times New Roman", serif; }
+  main { max-width:760px; margin:0 auto; padding:2rem 1.25rem 4rem; }
+  h1 { font-size:2rem; line-height:1.25; margin:.5rem 0 .25rem; color:var(--accent); }
+  h2 { font-size:1.35rem; margin:2.2rem 0 .6rem; padding-bottom:.25rem; border-bottom:1px solid var(--line); }
+  h3 { font-size:1.05rem; margin:1.4rem 0 .4rem; }
+  .meta { color:var(--muted); font-size:.95rem; margin-bottom:1.5rem; }
+  .abstract { background:var(--code); border-left:4px solid var(--accent); padding:.8rem 1.1rem; }
+  .table-wrap { overflow-x:auto; }
+  table { border-collapse:collapse; margin:1rem 0; width:100%; font-size:.95rem; }
+  th, td { border:1px solid var(--line); padding:.45rem .7rem; text-align:left; }
+  th { background:var(--code); }
+  code { background:var(--code); padding:.1rem .35rem; border-radius:3px; font-size:.9em; }
+  blockquote { margin:1rem 0; padding-left:1rem; border-left:3px solid var(--line); color:var(--muted); }
+  footer { margin-top:3rem; color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Predicting Content Decline to Prioritize Content Review</h1>
+<div class="meta">FlyRank ML Internship Capstone &middot; Lane: Refresh / Content Opportunity Scoring</div>
+
+<h2>Abstract</h2>
+<div class="abstract">
+<p>This capstone investigates whether machine learning can identify content that is likely to be declining and help prioritize which content should be reviewed first. A Logistic Regression model was trained using content-performance and engagement features and evaluated using a client-grouped train/test split to reduce client-level leakage. On the held-out test set, the model achieved a Precision@20 of 0.70 and Precision@50 of 0.72, compared with 0.35 and 0.46 respectively for the Week-4 baseline. The model achieved a ROC-AUC of 0.615, indicating moderate predictive separation while showing that the task remains challenging. The resulting predictions were converted into a ranked action playbook containing review priorities and interpretable reason codes.</p>
+</div>
+
+<h2>1. Introduction / Problem Statement</h2>
+<p>Content teams often have more published content than they can manually review. The practical challenge is therefore not simply determining whether a piece of content is declining, but deciding which content should receive attention first.</p>
+<p>This capstone addresses the following decision:</p>
+<blockquote>Given a large collection of content, which items should be prioritized for human review because their observed characteristics are associated with content decline?</blockquote>
+<p>The project focuses on ranking content for review rather than automatically deciding what action should be taken. The model provides a prioritization signal that can help a content team focus its limited review resources on a smaller set of potentially declining items.</p>
+<p>The primary evaluation metric is therefore Precision@K, which measures how many of the highest-ranked items are actually members of the declining class.</p>
+
+<h2>2. Data</h2>
+<p>The analysis uses the FlyRank ML Internship dataset and the provided anonymized content-performance release.</p>
+<p>The working dataset contains 30,000 content records and 44 modeling variables after preprocessing. The target variable is <code>is_declining_label</code>, with 16,262 records labeled as declining and 13,738 labeled as non-declining, an overall declining rate of approximately 54.21%.</p>
+<p>The analysis uses content-level performance and descriptive variables available in the provided release, including measures related to impressions, clicks, sessions, search position, content age, freshness, word count, content type, and derived tiers. Duplicate records were checked and none were found.</p>
+<p>The dataset was divided using a client-grouped split. The training partition contains 23,837 rows from 25 clients, while the test partition contains 6,163 rows from 7 clients. There is zero client overlap between the two partitions. A dedicated leakage audit was performed and passed: the label source (<code>trend_direction</code>), the label itself, and client/content identifiers were excluded from the features.</p>
+<p>Because the analysis is based on an anonymized dataset, no client-identifying or otherwise private information is presented in this paper.</p>
+
+<h2>3. Methodology</h2>
+<h3>Research Question</h3>
+<p>Can a simple supervised learning model rank potentially declining content more effectively than the existing baseline?</p>
+
+<h3>Target Definition</h3>
+<p><code>is_declining_label</code> is binary: 1 = content labeled as declining, 0 = content labeled as non-declining. The model estimates the probability that an item belongs to the declining class.</p>
+
+<h3>Features</h3>
+<p>The model uses numerical and categorical variables describing content performance and characteristics: 90-day impressions, clicks and sessions; average search position; content age; days since update; word count; content type; position, impression, word-count and freshness tiers; and related engagement indicators. Skewed traffic variables are log-transformed (<code>log1p</code>), numeric variables are median-imputed and standardized, and categorical variables are one-hot encoded. All preprocessing is fitted on training data only.</p>
+
+<h3>Model</h3>
+<p>The primary model is Logistic Regression, selected as a simple and interpretable model whose coefficients give directional signals about which features are associated with higher or lower predicted decline probability.</p>
+
+<h3>Baseline</h3>
+<p>The model is compared against the Week-4 rule-based baseline, which sums three flags: stale (at least 180 days since update), visible (at least 500 impressions in 90 days), and weak position (average position of 10 or worse). Both approaches are evaluated on the same held-out test partition.</p>
+
+<h3>Validation Design</h3>
+<div class="table-wrap"><table>
+<tr><th>Partition</th><th>Rows</th><th>Clients</th><th>Declining rate</th></tr>
+<tr><td>Training</td><td>23,837</td><td>25</td><td>55.01%</td></tr>
+<tr><td>Test</td><td>6,163</td><td>7</td><td>51.10%</td></tr>
+</table></div>
+<p>Client overlap is 0, meaning clients in the test set were not represented in the training set.</p>
+
+<h3>Evaluation Metrics</h3>
+<p>The primary metric is Precision@K, particularly Precision@20 and Precision@50, because the practical use case is prioritizing a limited number of items for human review. Diagnostic metrics: ROC-AUC, precision, recall, F1, accuracy, and false-positive/false-negative counts.</p>
+
+<h2>4. Results</h2>
+<p>The Logistic Regression model was evaluated against the Week-4 baseline on the same client-held-out test set.</p>
+<div class="table-wrap"><table>
+<tr><th>Method</th><th>Precision@20</th><th>Precision@50</th><th>Test base rate</th></tr>
+<tr><td>Week-4 baseline</td><td>0.35</td><td>0.46</td><td>0.511</td></tr>
+<tr><td>Logistic Regression</td><td>0.70</td><td>0.72</td><td>0.511</td></tr>
+</table></div>
+<p>The model improves Precision@20 by 0.35 absolute points and Precision@50 by 0.26 absolute points over the baseline.</p>
+<div class="table-wrap"><table>
+<tr><th>K</th><th>Model Precision@K</th></tr>
+<tr><td>10</td><td>0.80</td></tr>
+<tr><td>20</td><td>0.70</td></tr>
+<tr><td>50</td><td>0.72</td></tr>
+<tr><td>100</td><td>0.70</td></tr>
+</table></div>
+<p>The model achieved a ROC-AUC of 0.615. At the diagnostic threshold of 0.5: accuracy 0.58; declining-class precision 0.57, recall 0.73, F1 0.64. There were 2,559 classification errors in the 6,163-row test set: 1,694 false positives and 865 false negatives.</p>
+<p>These results show that the model's strongest demonstrated value is ranking and prioritization, rather than classifying every content item correctly.</p>
+
+<h2>5. Limitations &amp; Honest Framing</h2>
+<p>The results should be interpreted as decision-support signals rather than definitive predictions of future content performance.</p>
+<p>The model identifies statistical relationships between the available features and the provided declining label. A model coefficient or high predicted probability does not establish that a feature causes content to decline, and nothing here explains how Google's ranking system works.</p>
+<p>The ROC-AUC of 0.615 and threshold-based accuracy of 0.58 indicate modest overall classification performance. The model should not be described as highly accurate or as a definitive detector of content decline.</p>
+<p>The evaluation uses one client-grouped train/test split with only 7 test clients. Additional validation across different time periods and client groups would provide stronger evidence of generalization. Precision@20 rests on only 20 items, so small changes in the ranking move it noticeably. The test set contains 6,163 keyword-article records, so the observed error rate should not be generalized to other content types.</p>
+<p>Finally, a high decline probability does not guarantee that a particular intervention will improve content performance. The recommendations are intended to prioritize human review, not replace editorial or SEO judgment.</p>
+
+<h2>6. Ranked Recommendations</h2>
+<p>Model predictions were converted into a ranked action playbook, ordered by predicted probability of belonging to the declining class. Tiers: ranks 1&ndash;20 Priority review; 21&ndash;50 Review next; 51&ndash;100 Monitor; remaining Lower priority. These thresholds are operational choices, not a universal optimal review budget.</p>
+<p>The top 20 items received predicted probabilities between approximately 0.920 and 0.958. Common reason codes include Low CTR, Low engagement, Established search visibility, and Weak average position. Reason codes are rule-based review prompts, not explanations of the model's internal decision for an individual page.</p>
+<h3>Example of the Action Playbook</h3>
+<div class="table-wrap"><table>
+<tr><th>Rank</th><th>Decline Probability</th><th>Recommended Action</th><th>Reason Codes</th></tr>
+<tr><td>1</td><td>0.958</td><td>Priority review</td><td>Low CTR; Low engagement</td></tr>
+<tr><td>2</td><td>0.955</td><td>Priority review</td><td>Low CTR; Low engagement</td></tr>
+<tr><td>3</td><td>0.948</td><td>Priority review</td><td>Established search visibility; Low CTR; Low engagement</td></tr>
+<tr><td>4</td><td>0.945</td><td>Priority review</td><td>Established search visibility; Low CTR; Low engagement</td></tr>
+<tr><td>5</td><td>0.943</td><td>Priority review</td><td>Weak average position; Established search visibility; Low CTR</td></tr>
+</table></div>
+<p>The ranked playbook should be treated as a review queue. Human reviewers can use the reason codes and underlying content context to decide whether an item needs updating, investigation, or no intervention. The complete ranked output is in <code>capstone_action_playbook.csv</code> in the repository.</p>
+
+<h2>7. Reproducibility</h2>
+<p>The analysis was developed as a reproducible notebook-based workflow.</p>
+<ul>
+<li><code>capstone.ipynb</code> &mdash; complete analysis and modeling workflow</li>
+<li><code>capstone_results.csv</code> &mdash; model evaluation results</li>
+<li><code>capstone_action_playbook.csv</code> &mdash; ranked recommendations</li>
+<li><code>outputs/</code> &mdash; generated analysis artifacts and results</li>
+</ul>
+<p>Random state 42. Recorded run: 30,000 total records; 23,837 training and 6,163 test records; 25 training and 7 test clients; 0 client overlap; Precision@20 = 0.700; Precision@50 = 0.720.</p>
+<p>Repository: <a href="https://github.com/daniausman24-bot/ML_Internship_Track">github.com/daniausman24-bot/ML_Internship_Track</a></p>
+
+<h2>8. Acknowledgments &amp; Data Credit</h2>
+<p>This project was completed as part of the FlyRank ML Internship and uses the provided anonymized FlyRank ML Internship dataset.</p>
+<p><strong>Data credit: Built on the FlyRank ML Internship dataset.</strong> (<a href="https://flyrank.ai">FlyRank</a>)</p>
+<p>The analysis and interpretations presented here are the work of the project author and should not be interpreted as claims made by the data provider.</p>
+
+<footer>Dania &middot; FAST-NUCES</footer>
+</main>
+</body>
+</html>
