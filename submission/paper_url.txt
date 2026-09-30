@@ -1,1 +1,240 @@
-PASTE-YOUR-DEPLOYED-PAPER-URL-HERE
+# Predicting Content Decline to Prioritize Content Review
+
+## Abstract
+
+This capstone investigates whether machine learning can identify content that is likely to be declining and help prioritize which content should be reviewed first. A Logistic Regression model was trained using content-performance and engagement features and evaluated using a client-grouped train/test split to reduce client-level leakage. On the held-out test set, the model achieved a Precision@20 of 0.70 and Precision@50 of 0.72, compared with 0.35 and 0.46 respectively for the Week-4 baseline. The model achieved a ROC-AUC of 0.615, indicating moderate predictive separation while showing that the task remains challenging. The resulting predictions were converted into a ranked action playbook containing review priorities and interpretable reason codes.
+
+---
+
+## 1. Introduction / Problem Statement
+
+Content teams often have more published content than they can manually review. The practical challenge is therefore not simply determining whether a piece of content is declining, but deciding **which content should receive attention first**.
+
+This capstone addresses the following decision:
+
+> **Given a large collection of content, which items should be prioritized for human review because their observed characteristics are associated with content decline?**
+
+The project focuses on ranking content for review rather than automatically deciding what action should be taken. The model provides a prioritization signal that can help a content team focus its limited review resources on a smaller set of potentially declining items.
+
+The primary evaluation metric is therefore Precision@K, which measures how many of the highest-ranked items are actually members of the declining class.
+
+---
+
+## 2. Data
+
+The analysis uses the FlyRank ML Internship dataset and the provided anonymized content-performance release.
+
+The working dataset contains **30,000 content records and 44 modeling variables** after preprocessing. The target variable is `is_declining_label`, with 16,262 records labeled as declining and 13,738 labeled as non-declining. This corresponds to an overall declining rate of approximately **54.21%**.
+
+The analysis uses content-level performance and descriptive variables available in the provided release, including measures related to impressions, clicks, sessions, search position, content age, freshness, word count, content type, and derived tiers.
+
+Duplicate records were checked and none were found.
+
+The dataset was divided into training and test partitions using a **client-grouped split**. The training partition contains 23,837 rows from 25 clients, while the test partition contains 6,163 rows from 7 clients. There is **zero client overlap** between the two partitions.
+
+The analysis excludes information that would create leakage between the training and test partitions. A dedicated leakage audit was performed and passed.
+
+Because the public-facing analysis is based on an anonymized dataset, no client-identifying or otherwise private information is presented in this paper.
+
+---
+
+## 3. Methodology
+
+### Research Question
+
+The central question is:
+
+> Can a simple supervised learning model rank potentially declining content more effectively than the existing baseline?
+
+### Target Definition
+
+The prediction target is `is_declining_label`, a binary variable:
+
+* `1` — content labeled as declining
+* `0` — content labeled as non-declining
+
+The model estimates the probability that an item belongs to the declining class.
+
+### Features
+
+The model uses numerical and categorical variables describing content performance and characteristics.
+
+Important feature groups include:
+
+* 90-day impressions
+* 90-day clicks
+* 90-day sessions
+* Average search position
+* Content age
+* Days since update / freshness
+* Word count
+* Content type
+* Search position tiers
+* Impression tiers
+* Word-count tiers
+* Freshness tiers
+* Related engagement indicators
+
+Numerical variables are transformed where appropriate, while categorical variables are encoded before being provided to the classifier.
+
+### Model
+
+The primary model is **Logistic Regression**.
+
+Logistic Regression was selected as a relatively simple and interpretable baseline model. Its coefficients provide directional signals that can help explain which features are associated with higher or lower predicted decline probability.
+
+### Baseline
+
+The model is compared against the existing **Week-4 baseline**.
+
+Both approaches are evaluated on the same held-out test partition so that the comparison is directly aligned.
+
+### Validation Design
+
+A client-grouped train/test split was used:
+
+| Partition |   Rows | Clients |
+| --------- | -----: | ------: |
+| Training  | 23,837 |      25 |
+| Test      |  6,163 |       7 |
+
+Client overlap is **0**, meaning that clients represented in the test set were not represented in the training set.
+
+The declining rate was 55.01% in training and 51.10% in testing, providing a relatively similar class distribution across the two partitions.
+
+A leakage audit was also performed and passed.
+
+### Evaluation Metrics
+
+The primary metric is **Precision@K**, particularly Precision@20 and Precision@50.
+
+Additional diagnostic metrics include:
+
+* ROC-AUC
+* Precision
+* Recall
+* F1-score
+* Accuracy
+* False-positive and false-negative counts
+
+## Precision@K is emphasized because the practical use case is prioritizing a limited number of content items for human review.
+
+## 4. Results
+
+The Logistic Regression model was evaluated against the Week-4 baseline on the same client-held-out test set.
+
+| Method              | Precision@20 | Precision@50 | Test Base Rate |
+| ------------------- | -----------: | -----------: | -------------: |
+| Week-4 baseline     |         0.35 |         0.46 |          0.511 |
+| Logistic Regression |     **0.70** |     **0.72** |          0.511 |
+
+The model improves Precision@20 by **0.35 absolute points** and Precision@50 by **0.26 absolute points** compared with the baseline.
+
+At different ranking depths, the model achieved:
+
+|   K | Model Precision@K |
+| --: | ----------------: |
+|  10 |              0.80 |
+|  20 |              0.70 |
+|  50 |              0.72 |
+| 100 |              0.70 |
+
+The model achieved a **ROC-AUC of 0.615**.
+
+At the diagnostic threshold of 0.5, the model achieved:
+
+* Accuracy: **0.58**
+* Declining-class precision: **0.57**
+* Declining-class recall: **0.73**
+* Declining-class F1: **0.64**
+
+There were **2,559 classification errors** in the 6,163-row test set, consisting of 1,694 false positives and 865 false negatives.
+
+These results show that the model's strongest demonstrated value is **ranking and prioritization**, rather than perfectly classifying every content item.
+
+---
+
+## 5. Limitations & Honest Framing
+
+The results should be interpreted as **decision-support signals rather than definitive predictions of future content performance**.
+
+The model identifies statistical relationships between the available features and the provided declining label. A model coefficient or high predicted probability does not establish that a feature causes content to decline.
+
+The ROC-AUC of 0.615 and threshold-based accuracy of 0.58 indicate moderate overall classification performance. Therefore, the model should not be described as highly accurate or as a definitive detector of content decline.
+
+The evaluation is also based on one client-grouped train/test split. While the zero client overlap provides an important protection against client-level leakage, additional validation across different time periods and client groups would provide stronger evidence of generalization.
+
+The test set contains 6,163 keyword-article records. Consequently, the observed error rate for that test set should not be generalized to other content types.
+
+Finally, a high decline probability does not guarantee that a particular intervention will improve content performance. The generated recommendations are intended to **prioritize human review**, not replace editorial or SEO judgment.
+
+---
+
+## 6. Ranked Recommendations
+
+The model predictions were converted into a ranked action playbook. Content was ordered according to predicted probability of belonging to the declining class.
+
+The top 20 items received predicted probabilities between approximately **0.920 and 0.958**.
+
+Common reason codes include:
+
+* Low CTR
+* Low engagement
+* Established search visibility
+* Weak average position
+
+The highest-ranked item had a predicted decline probability of approximately **0.958** and was assigned a **Priority review** action.
+
+The ranked playbook should be interpreted as a review queue. Human reviewers can use the reason codes and underlying content context to determine whether an item requires updating, further investigation, or no intervention.
+
+### Example of the Action Playbook
+
+| Rank | Decline Probability | Recommended Action | Reason Codes                                                  |
+| ---: | ------------------: | ------------------ | ------------------------------------------------------------- |
+|    1 |               0.958 | Priority review    | Low CTR; Low engagement                                       |
+|    2 |               0.955 | Priority review    | Low CTR; Low engagement                                       |
+|    3 |               0.948 | Priority review    | Established search visibility; Low CTR; Low engagement        |
+|    4 |               0.945 | Priority review    | Established search visibility; Low CTR; Low engagement        |
+|    5 |               0.943 | Priority review    | Weak average position; Established search visibility; Low CTR |
+
+The complete ranked output is provided in the `capstone_action_playbook.csv` artifact.
+
+---
+
+## 7. Reproducibility
+
+The analysis was developed as a reproducible notebook-based workflow.
+
+### Project Artifacts
+
+* `capstone.ipynb` — complete analysis and modeling workflow
+* `capstone_results.csv` — model evaluation results
+* `capstone_action_playbook.csv` — ranked recommendations
+* `outputs/` — generated analysis artifacts and results
+
+The experiment uses **random state 42**.
+
+The final experiment records:
+
+* 30,000 total records
+* 23,837 training records
+* 6,163 test records
+* 25 training clients
+* 7 test clients
+* 0 client overlap
+* Precision@20 = 0.700
+* Precision@50 = 0.720
+
+The complete implementation and supporting artifacts are available in the project repository.
+
+---
+
+## 8. Acknowledgments & Data Credit
+
+This project was completed as part of the FlyRank ML Internship and uses the provided anonymized FlyRank ML Internship dataset.
+
+**Data credit:** Built on the FlyRank ML Internship dataset.
+
+[FlyRank](https://flyrank.ai)
+
+The analysis and interpretations presented in this capstone are the work of the project author and should not be interpreted as claims made by the data provider.
